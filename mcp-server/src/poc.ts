@@ -14,32 +14,78 @@ import { POC_DIR, PATH_TRAVERSAL_TEMP_FILE } from './constants.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+export function extractNpmPackages(content: string): string[] {
+  const packages = new Set<string>();
+
+  const importFromRegex = /import\s+(?:[\w\s{},*]+|{.*})\s+from\s+['"]([^'"]+)['"]/g;
+  const importRegex = /import\s+['"]([^'"]+)['"]/g;
+  const requireRegex = /require\(['"]([^'"]+)['"]\)/g;
+
+  let match;
+  while ((match = importFromRegex.exec(content)) !== null) {
+    packages.add(match[1]);
+  }
+  const importRegexOnly = /import\s+['"]([^'"]+)['"]/g;
+  while ((match = importRegexOnly.exec(content)) !== null) {
+    packages.add(match[1]);
+  }
+  while ((match = requireRegex.exec(content)) !== null) {
+    packages.add(match[1]);
+  }
+
+  const BUILTIN_MODULES = new Set([
+    'assert', 'buffer', 'child_process', 'cluster', 'console', 'constants',
+    'crypto', 'dgram', 'dns', 'domain', 'events', 'fs', 'http', 'http2',
+    'https', 'inspector', 'module', 'net', 'os', 'path', 'perf_hooks',
+    'process', 'punycode', 'querystring', 'readline', 'repl', 'stream',
+    'string_decoder', 'timers', 'tls', 'tty', 'url', 'util', 'v8', 'vm',
+    'zlib'
+  ]);
+
+  const result: string[] = [];
+  for (const pkg of packages) {
+    if (pkg.startsWith('.') || pkg.startsWith('/')) continue;
+    if (BUILTIN_MODULES.has(pkg)) continue;
+
+    const parts = pkg.split('/');
+    if (pkg.startsWith('@') && parts.length >= 2) {
+      result.push(`${parts[0]}/${parts[1]}`);
+    } else {
+      result.push(parts[0]);
+    }
+  }
+
+  return Array.from(new Set(result));
+}
+
+export interface RunPocResult {
+  stdout: string;
+  stderr: string;
+  error?: string;
+  isSecurityError?: boolean;
+}
+
 export async function runPoc(
   {
     filePath,
   }: {
-      filePath: string;
+    filePath: string;
   },
   dependencies: { fs: typeof fs; path: typeof path; execAsync: typeof execAsync; execFileAsync: typeof execFileAsync } = { fs, path, execAsync, execFileAsync }
-): Promise<CallToolResult> {
+): Promise<RunPocResult> {
   try {
     const pocDir = dependencies.path.dirname(filePath);
 
-// 🛡️ Validate that the filePath is within the safe PoC directory
+    // Validate that the filePath is within the safe PoC directory
     const resolvedFilePath = dependencies.path.resolve(filePath);
     const safePocDir = dependencies.path.resolve(process.cwd(), POC_DIR);
 
     if (!resolvedFilePath.startsWith(safePocDir + dependencies.path.sep)) {
       return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              error: `Security Error: PoC execution is restricted to files within '${safePocDir}'. Attempted to access '${resolvedFilePath}'.`,
-            }),
-          },
-        ],
-        isError: true,
+        stdout: '',
+        stderr: '',
+        error: `Security Error: PoC execution is restricted to files within '${safePocDir}'. Attempted to access '${resolvedFilePath}'.`,
+        isSecurityError: true,
       };
     }
 
@@ -102,9 +148,27 @@ export async function runPoc(
 
       installCmd = 'go mod tidy';
     } else {
-      runCmd = 'node';
-      runArgs = [filePath];
-      installCmd = 'npm install --registry=https://registry.npmjs.org/';
+      const content = await dependencies.fs.readFile(filePath, 'utf-8').catch(() => '');
+      const packages = extractNpmPackages(content);
+
+      if (ext === '.ts') {
+        if (!packages.includes('ts-node')) packages.push('ts-node');
+      }
+
+      if (packages.length > 0) {
+        runCmd = 'npx';
+        const packageFlags = packages.flatMap(p => ['--package', p]);
+
+        if (ext === '.ts') {
+          runArgs = [...packageFlags, 'ts-node', filePath];
+        } else {
+          runArgs = [...packageFlags, 'node', filePath];
+        }
+      } else {
+        runCmd = 'node';
+        runArgs = [filePath];
+      }
+      installCmd = null;
     }
 
     if (installCmd) {
@@ -118,8 +182,16 @@ export async function runPoc(
 
     let output: { stdout: string; stderr: string };
 
+    const execOptions: any = { cwd: pocDir };
+    if (runCmd === 'npx') {
+      execOptions.env = {
+        ...process.env,
+        npm_config_cache: dependencies.path.join(pocDir, '.npx_cache')
+      };
+    }
+
     try {
-      output = await dependencies.execFileAsync(runCmd, runArgs);
+      output = (await dependencies.execFileAsync(runCmd, runArgs, execOptions)) as unknown as { stdout: string; stderr: string };
     } catch (error: any) {
       const errorMessage = error.message || '';
       const errorOutput = (error.stdout || '') + (error.stderr || '');
@@ -136,8 +208,7 @@ export async function runPoc(
             await dependencies.execAsync(`python -m venv --system-site-packages "${venvDir}"`);
           }
 
-          // Retry execution with the updated venv
-          output = await dependencies.execFileAsync(runCmd, runArgs);
+          output = (await dependencies.execFileAsync(runCmd, runArgs, execOptions)) as unknown as { stdout: string; stderr: string };
         } catch (retryError: any) {
           // If retry fails, throw the original error (or the retry error if it's new/different)
           throw retryError;
@@ -149,14 +220,7 @@ export async function runPoc(
 
     const { stdout, stderr } = output;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({ stdout, stderr }),
-        },
-      ],
-    };
+    return { stdout, stderr };
   } catch (error) {
     let errorMessage = 'An unknown error occurred.';
     let stdout = '';
@@ -170,13 +234,9 @@ export async function runPoc(
     }
 
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({ error: errorMessage, stdout, stderr }),
-        },
-      ],
-      isError: true,
+      error: errorMessage,
+      stdout,
+      stderr,
     };
   } finally {
     // Cleanup path traversal temp file if it exists
