@@ -365,7 +365,7 @@ server.tool(
         }
       }
 
-      const output = await execAsync(input.script, { cwd: executionDir });
+      const output = await execFileAsync(input.script, { cwd: executionDir });
       return {
         content: [
           {
