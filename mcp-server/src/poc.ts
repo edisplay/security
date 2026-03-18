@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { exec, execFile } from 'child_process';
@@ -14,49 +13,6 @@ import { POC_DIR, PATH_TRAVERSAL_TEMP_FILE } from './constants.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
-export function extractNpmPackages(content: string): string[] {
-  const packages = new Set<string>();
-
-  const importFromRegex = /import\s+(?:[\w\s{},*]+|{.*})\s+from\s+['"]([^'"]+)['"]/g;
-  const importRegex = /import\s+['"]([^'"]+)['"]/g;
-  const requireRegex = /require\(['"]([^'"]+)['"]\)/g;
-
-  let match;
-  while ((match = importFromRegex.exec(content)) !== null) {
-    packages.add(match[1]);
-  }
-  const importRegexOnly = /import\s+['"]([^'"]+)['"]/g;
-  while ((match = importRegexOnly.exec(content)) !== null) {
-    packages.add(match[1]);
-  }
-  while ((match = requireRegex.exec(content)) !== null) {
-    packages.add(match[1]);
-  }
-
-  const BUILTIN_MODULES = new Set([
-    'assert', 'buffer', 'child_process', 'cluster', 'console', 'constants',
-    'crypto', 'dgram', 'dns', 'domain', 'events', 'fs', 'http', 'http2',
-    'https', 'inspector', 'module', 'net', 'os', 'path', 'perf_hooks',
-    'process', 'punycode', 'querystring', 'readline', 'repl', 'stream',
-    'string_decoder', 'timers', 'tls', 'tty', 'url', 'util', 'v8', 'vm',
-    'zlib'
-  ]);
-
-  const result: string[] = [];
-  for (const pkg of packages) {
-    if (pkg.startsWith('.') || pkg.startsWith('/')) continue;
-    if (BUILTIN_MODULES.has(pkg)) continue;
-
-    const parts = pkg.split('/');
-    if (pkg.startsWith('@') && parts.length >= 2) {
-      result.push(`${parts[0]}/${parts[1]}`);
-    } else {
-      result.push(parts[0]);
-    }
-  }
-
-  return Array.from(new Set(result));
-}
 
 export interface RunPocResult {
   stdout: string;
@@ -148,22 +104,9 @@ export async function runPoc(
 
       installCmd = 'go mod tidy';
     } else {
-      const content = await dependencies.fs.readFile(filePath, 'utf-8').catch(() => '');
-      const packages = extractNpmPackages(content);
-
       if (ext === '.ts') {
-        if (!packages.includes('ts-node')) packages.push('ts-node');
-      }
-
-      if (packages.length > 0) {
         runCmd = 'npx';
-        const packageFlags = packages.flatMap(p => ['--package', p]);
-
-        if (ext === '.ts') {
-          runArgs = [...packageFlags, 'ts-node', filePath];
-        } else {
-          runArgs = [...packageFlags, 'node', filePath];
-        }
+        runArgs = ['ts-node', filePath];
       } else {
         runCmd = 'node';
         runArgs = [filePath];

@@ -28,14 +28,12 @@ describe('runPoc', () => {
   it('should execute a Node.js file', async () => {
     const mockExecAsync = vi.fn(async () => { return { stdout: '', stderr: '' }; });
     const mockExecFileAsync = vi.fn(async () => { return { stdout: 'output', stderr: '' }; });
-    const mockReadFile = vi.fn(async () => 'interface Foo {}');
 
     const result = await runPoc(
       { filePath: `${POC_DIR}/test.js` },
       { 
         fs: { 
           access: vi.fn().mockRejectedValue(new Error()),
-          readFile: mockReadFile
         } as any, 
         path: mockPath as any, 
         execAsync: mockExecAsync as any, 
@@ -153,24 +151,3 @@ describe('runPoc', () => {
   });
 });
 
-import { extractNpmPackages } from './poc.js';
-
-describe('extractNpmPackages', () => {
-  it('should extract packages from imports and requires', () => {
-    const content = `
-      import { JSDOM } from 'jsdom';
-      import fs from 'fs';
-      const express = require('express');
-      const axios = require('axios/lib/core');
-      import * as d3 from 'd3';
-    `;
-    const packages = extractNpmPackages(content);
-    expect(packages.sort()).toEqual(['jsdom', 'express', 'axios', 'd3'].sort());
-  });
-
-  it('should handle scoped packages', () => {
-    const content = `import { something } from '@types/node';`;
-    const packages = extractNpmPackages(content);
-    expect(packages).toEqual(['@types/node']);
-  });
-});
