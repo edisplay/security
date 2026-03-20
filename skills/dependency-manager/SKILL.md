@@ -19,4 +19,4 @@ Proceed with these steps to ensure isolated execution while bypassing full insta
 4.  **Write Deterministic Running Script**:
     *   Generate a standalone dependency runner file on disk named deterministically e.g., `install_deps_<target_file_base>.sh` (or `.js`/`.py`).
 5.  **Trigger Isolated Execute**:
-    *   Call the `install_dependencies` Tool passing the generated script string block AND providing `targetFile` as an argument to let the tool calculate isolated execution contexts.
+    *   Call the `install_dependencies` Tool passing the absolute path to the generated script in the `scriptPath` argument AND providing `targetFile` as an argument to let the tool calculate isolated execution contexts.

@@ -56,6 +56,9 @@ ${pocFilePath || 'No content available.'}
 \`\`\`
 ${fileContent || 'No content available.'}
 \`\`\`
+
+**Next Steps:**
+Invoke the security-patcher skill to apply the fix.
 `,
       },
     ],

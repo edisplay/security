@@ -10,7 +10,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { promises as fs } from 'fs';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import { getAuditScope, detectProjectLanguage } from './filesystem.js';
@@ -334,15 +334,15 @@ server.tool(
 
 server.tool(
   'install_dependencies',
-  'Executes a script string inside workspace.',
+  'Executes a script file inside workspace.',
   {
-    script: z.string().describe('Command or script to execute.'),
+    scriptPath: z.string().describe('Absolute path to the script file to execute.'),
     targetFile: z.string().describe('The target file requiring dependencies.'),
     cwd: z.string().optional().describe('Execution directory (optional. overrides calculation).'),
   } as any,
-  (async (input: { script: string; targetFile: string; cwd?: string }) => {
+  (async (input: { scriptPath: string; targetFile: string; cwd?: string }) => {
     try {
-      const execAsync = promisify(exec);
+      const execFileAsync = promisify(execFile);
       let executionDir = input.cwd;
 
       if (!executionDir) {
@@ -365,7 +365,8 @@ server.tool(
         }
       }
 
-      const output = await execFileAsync(input.script, { cwd: executionDir });
+      await fs.chmod(input.scriptPath, 0o755);
+      const output = await execFileAsync(input.scriptPath, { cwd: executionDir });
       return {
         content: [
           {
