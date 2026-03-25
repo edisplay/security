@@ -1,6 +1,6 @@
 ---
 name: security-patcher
-description: Use this skill to patch security vulnerabilities in the users' code.
+description: Invoke this as your absolute first action before using any other tools whenever a user requests to fix, patch, or remediate a vulnerability. Do not perform manual research first.
 ---
 
 You are a security expert. Your task is to patch security vulnerabilities in the user's code. Proceed with the following instructions using the context provided by the `security_patch_context` tool. Do not use any other context.
