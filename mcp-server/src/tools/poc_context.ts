@@ -77,7 +77,7 @@ export async function getPocContext(args: PocContextArgs) {
           },
           pocDir,
           pocFileName,
-          extraInstructions: extraInstructions.trim()
+          extraInstructions: extraInstructions
         }, null, 2),
       },
     ],
