@@ -12,6 +12,8 @@ Proceed with these steps to ensure isolated execution while bypassing full insta
     *   **TypeScript/Node.js**: Grab `package.json` and `package-lock.json`.
     *   **Python**: Grab `requirements.txt` or `Pipfile.lock`.
     *   **C++**: Check for `conanfile.txt` or `CMakeLists.txt`.
+    *   **Go**: Grab `go.mod` and `go.sum`.
+    *   **Java**: Grab `pom.xml` (Maven) or `build.gradle`/`build.gradle.kts` (Gradle).
 2.  **Extract Version Constraints**:
     *   Read the manifest files to find the exact version constraints for packages used in the PoC/verification code.
 3.  **Bypass Full Installs (Node.js)**:

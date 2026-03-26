@@ -10,6 +10,7 @@ You are a security expert. Your task is to patch security vulnerabilities in the
 1. **Pre-Requisites:**
     *   Check for the existence of a security report in the `.gemini_security/` directory.
     *   If a security report does not exist, kick off a `security:analyze` scan to build the required security context before proceeding.
+    *   Identify and run the repository's existing test suite (e.g., `npm test`, `pytest`, `go test ./...`) to establish a working baseline. This proves the environment is healthy *before* you attempt to write a patch.
 2. **Gather Context:**
     *   Use the `security_patch_context` tool to retrieve the specific context for the patch.
 3. **Analyze and Prepare Patch:**
@@ -27,3 +28,4 @@ You are a security expert. Your task is to patch security vulnerabilities in the
 7.  **Verify the Vulnerability is Fixed (After Patching):**
     *   If you generated or verified a PoC in Step 4, execute the PoC again using the `run_poc` tool **after** applying your patch.
     *   Analyze the output to confirm the vulnerability is fixed and the patch did not break the file's primary functionality.
+    *   Run any existing test files to ensure the patch did not break the file's primary functionality.
