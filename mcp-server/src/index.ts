@@ -18,9 +18,9 @@ import { findLineNumbers } from './security.js';
 import { parseMarkdownToDict } from './parser.js';
 import { SECURITY_DIR_NAME, POC_DIR_NAME, PATH_TRAVERSAL_TEMP_FILE } from './constants.js';
 import { loadKnowledge, VulnerabilityType } from './knowledge.js';
+import { SECURITY_PATCH_CONTEXT_TOOL_NAME, SECURITY_PATCH_CONTEXT_TOOL_DESCRIPTION, SecurityPatchContextArgsSchema, getSecurityPatchContextMessages } from './tools/security_patch_context.js';
 import { POC_CONTEXT_TOOL_NAME, POC_CONTEXT_TOOL_DESCRIPTION, PocContextArgsSchema, getPocContext } from './tools/poc_context.js';
 import { RUN_POC_TOOL_NAME, RUN_POC_TOOL_DESCRIPTION, RunPocArgsSchema, getRunPocMessages } from './tools/run_poc.js';
-import { SECURITY_PATCH_CONTEXT_TOOL_NAME, SECURITY_PATCH_CONTEXT_TOOL_DESCRIPTION, SecurityPatchContextArgsSchema, getSecurityPatchContextMessages } from './tools/security_patch_context.js';
 
 // import { runPoc } from './poc.js';
 
@@ -78,16 +78,16 @@ server.tool(
     try {
       const reportPath = path.join(process.cwd(), `${SECURITY_DIR_NAME}/DRAFT_SECURITY_REPORT.md`);
       const outputPath = path.join(process.cwd(), `${SECURITY_DIR_NAME}/security_report.json`);
-      
+
       const content = await fs.readFile(reportPath, 'utf-8');
       const results = parseMarkdownToDict(content);
 
       await fs.writeFile(outputPath, JSON.stringify(results, null, 2));
 
       return {
-        content: [{ 
-          type: 'text', 
-          text: `Successfully created JSON report at ${outputPath}` 
+        content: [{
+          type: 'text',
+          text: `Successfully created JSON report at ${outputPath}`
         }]
       };
     } catch (error) {
@@ -113,12 +113,12 @@ server.registerPrompt(
   (args: any) => {
     const { notePath, content } = args;
     return {
-    messages: [
-      {
-        role: 'user' as const,
-        content: {
-          type: 'text' as const,
-          text: `You are a helpful assistant that helps users maintain notes. Your task is to add a new entry to the notes file at '${SECURITY_DIR_NAME}/${notePath}'.
+      messages: [
+        {
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: `You are a helpful assistant that helps users maintain notes. Your task is to add a new entry to the notes file at '${SECURITY_DIR_NAME}/${notePath}'.
 
         You MUST use the 'ReadFile' and 'WriteFile' tools.
 
@@ -140,9 +140,9 @@ server.registerPrompt(
                 *   Use the 'WriteFile' tool to create the new file with the complete initial content.
 
         Your primary goal is to maintain strict consistency with the format of the note file. Do not introduce any formatting changes.`,
+          },
         },
-      },
-    ],
+      ],
     }
   },
 );
