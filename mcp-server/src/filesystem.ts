@@ -5,8 +5,10 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { IGNORED_EXTENSIONS, IGNORED_FILES, IGNORED_FOLDERS } from './constants.js';
 
 /**
  * Checks if the current directory is a GitHub repository.
@@ -59,6 +61,79 @@ export function getAuditScope(base?: string, head?: string): string {
     } catch (_error) {
         return "";
     }
+}
+
+/**
+ * Gets a list of relevant file paths for auditing, filtering out irrelevant files and folders.
+ * Irrelevant files include documentation, tests, build artifacts, etc.
+ * @returns A list of relevant file paths for auditing.
+ */
+export function getFilesToAudit(): string[] {
+  try {
+    const trackedFiles = (
+      spawnSync('git', ['ls-files'], {
+        encoding: 'utf-8',
+      }).stdout || ''
+    )
+      .trim()
+      .split('\n');
+
+    const untrackedFiles = (
+      spawnSync('git', ['ls-files', '--others', '--exclude-standard'], {
+        encoding: 'utf-8',
+      }).stdout || ''
+    )
+      .trim()
+      .split('\n');
+
+    const allFiles = [...trackedFiles, ...untrackedFiles].filter((f) => f !== '');
+
+    return allFiles.filter((filePath) => {
+      const parts = filePath.split('/');
+      
+      // Ignore if any part of the path is in IGNORED_FOLDERS
+      if (parts.some(part => IGNORED_FOLDERS.includes(part))) {
+        return false;
+      }
+
+      const fileName = parts.pop() || '';
+      const fileNameLower = fileName.toLowerCase();
+
+      // Ignore exact files
+      if (IGNORED_FILES.some(file => fileNameLower === file.toLowerCase())) {
+        return false;
+      }
+
+      // Ignore extensions
+      if (IGNORED_EXTENSIONS.some(ext => fileNameLower.endsWith(ext.toLowerCase()))) {
+        return false;
+      }
+
+      return true;
+    });
+  } catch (error) {
+    console.error('Error reducing audit scope:', error);
+    return [];
+  }
+}
+
+/**
+ * Gets the total line count of a list of files.
+ * @param files A list of file paths.
+ * @returns The total line count of all files.
+ */
+export const getLineCount = (files: string[]): number => {
+  let totalLines = 0;
+  for (const file of files) {
+    try {
+      const content = readFileSync(file, 'utf-8');
+      const lineCount = (content.match(/\n/g) || []).length;
+      totalLines += lineCount;
+    } catch (error) {
+      console.error(`Error counting lines in file ${file}:`, error);
+    }
+  }
+  return totalLines;
 }
 
 /**
